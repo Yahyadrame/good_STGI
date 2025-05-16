@@ -1,5 +1,6 @@
 "use client";
 import { QueryProvider } from "./query-provider";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 interface ProviderProps {
   children: React.ReactNode;

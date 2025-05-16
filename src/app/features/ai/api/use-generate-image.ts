@@ -1,20 +1,26 @@
 import { useMutation } from "@tanstack/react-query";
-import { InferRequestType, InferResponseType } from "hono";
-import { client } from "@/lib/hono";
 
-type ResponseType = InferResponseType<
-  (typeof client.api.ai)["generate-image"]["$post"]
->;
-type RequestType = InferRequestType<
-  (typeof client.api.ai)["generate-image"]["$post"]
->["json"];
+type ResponseType = { data: string };
+type RequestType = { prompt: string };
 
 export const useGenerateImage = () => {
   const mutation = useMutation<ResponseType, Error, RequestType>({
     mutationFn: async (json) => {
-      const response = await client.api.ai["generate-image"].$post({ json });
+      console.log("Sending request to /api/ai/generate-image with:", json);
+      const response = await fetch("/api/ai/generate-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(json),
+      });
 
-      return await response.json();
+      console.log("Response status:", response.status);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log("Response data:", data);
+      return data;
     },
   });
 

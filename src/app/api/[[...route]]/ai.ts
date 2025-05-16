@@ -35,17 +35,37 @@ const app = new Hono()
       const { prompt } = c.req.valid("json");
 
       const input = {
-        scheduler: "K_EULER",
         prompt: prompt,
+        num_inference_steps: 50, // Ajusté pour une qualité raisonnable
+        guidance_scale: 7.5,
+        // Paramètres spécifiques à flux-dev-lora (optionnel, à ajuster selon les docs)
+        // Ajoute l'option go_fast si besoin : go_fast: true
       };
 
-      const output = await replicate.run("stability-ai/stable-diffusion-3", {
-        input,
-      });
+      try {
+        console.log("Calling Replicate with input:", input);
+        const output = await replicate.run("black-forest-labs/flux-dev-lora", {
+          input,
+        });
 
-      const res = output as Array<string>;
+        console.log("Replicate output:", output);
 
-      return c.json({ data: res[0] });
+        const res = Array.isArray(output) ? output[0] : output;
+        if (typeof res !== "string") {
+          throw new Error("Invalid image URL from Replicate");
+        }
+
+        return c.json({ data: res });
+      } catch (error) {
+        console.error("Error generating image:", error.message || error);
+        return c.json(
+          {
+            error: "Failed to generate image",
+            details: error.message || error.toString(),
+          },
+          502
+        );
+      }
     }
   );
 

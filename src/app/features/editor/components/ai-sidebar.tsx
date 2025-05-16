@@ -25,15 +25,34 @@ export const AiSidebar = ({
   const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
+    if (!editor) {
+      console.error("Editor is undefined");
+      return;
+    }
+
+    console.log("Submitting prompt:", value); // Log pour vérifier l'entrée
+
     mutation.mutate(
       { prompt: value },
       {
         onSuccess: ({ data }) => {
-          editor?.addImage(data);
+          console.log("Success - Generated image data:", data);
+          if (data && typeof data === "string") {
+            editor.addImage(data);
+          } else {
+            console.error("Invalid image data received:", data);
+          }
+        },
+        onError: (error) => {
+          console.error("Error generating image:", error.message || error);
+        },
+        onSettled: () => {
+          console.log("Mutation settled"); // Log quand la mutation se termine
         },
       }
     );
   };
+
   const onClose = () => {
     onChangeActiveTool("select");
   };
@@ -63,7 +82,7 @@ export const AiSidebar = ({
             className="w-full"
             disabled={mutation.isPending}
           >
-            Generate
+            {mutation.isPending ? "Generating..." : "Generate"}
           </Button>
         </form>
       </ScrollArea>

@@ -55,11 +55,15 @@ export const Editor = () => {
   );
   const canvasRef = useRef(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  
 
   useEffect(() => {
     const canvas = new fabric.Canvas(canvasRef.current, {
       controlsAboveOverlay: true,
       preserveObjectStacking: true,
+      enableRetinaScaling: true, // Améliore la netteté
+      uniScaleTransform: false, // Permet une rotation libre
+      rotatingPointOffset: 40, // Positionne la poignée de rotation
     });
     init({
       initialCanvas: canvas,

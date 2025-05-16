@@ -13,6 +13,7 @@ import {
   Copy,
   SquareSplitHorizontal,
   Trash,
+  RotateCcw, // Ajouter cette icône
 } from "lucide-react";
 import { TbColorFilter } from "react-icons/tb";
 import { RxTransparencyGrid } from "react-icons/rx";
@@ -26,6 +27,7 @@ interface ToolbarProps {
   activeTool: ActiveTool;
   onChangeActiveTool: (tool: ActiveTool) => void;
 }
+
 export const Toolbar = ({
   activeTool,
   editor,
@@ -105,6 +107,15 @@ export const Toolbar = ({
 
     editor?.changeFontLineThrough(newValue);
     setProperties((current) => ({ ...current, fontLineThrough: newValue }));
+  };
+
+  // Ajouter une fonction pour faire pivoter l'objet sélectionné
+  const rotateObject = () => {
+    const activeObject = editor?.canvas.getActiveObject();
+    if (activeObject) {
+      activeObject.rotate((activeObject.angle || 0) + 15); // Rotation de 15 degrés
+      editor?.canvas.renderAll();
+    }
   };
 
   if (editor?.selectedObjects.length === 0) {
@@ -333,13 +344,24 @@ export const Toolbar = ({
         </Hint>
       </div>
       <div className="flex items-center h-full justify-center">
-        <Hint label="send Backward" side="bottom" sideOffset={5}>
+        <Hint label="Send Backward" side="bottom" sideOffset={5}>
           <Button
             onClick={() => editor?.sendBackward()}
             size="icon"
             variant="ghost"
           >
             <ArrowDown className="size-4" />
+          </Button>
+        </Hint>
+      </div>
+      <div className="flex items-center h-full justify-center">
+        <Hint label="Rotate Clockwise" side="bottom" sideOffset={5}>
+          <Button
+            onClick={rotateObject}
+            size="icon"
+            variant="ghost"
+          >
+            <RotateCcw className="size-4" />
           </Button>
         </Hint>
       </div>

@@ -237,13 +237,17 @@ export const useEditor = ({ clearSelectionCallback }: EditorHookProps) => {
         canvas.renderAll();
       },
       addText: (value, options) => {
-        const object = new fabric.Text(value, {
+        const object = new fabric.IText(value, {
           ...TEXT_OPTIONS,
           fill: fillColor,
+          editable: true, // Assure que le texte est éditable
           ...options,
         });
 
         addToCanvas(object);
+        object.enterEditing(); // Active le mode édition
+        object.selectAll(); // Sélectionne tout le texte pour faciliter la modification
+        canvas.renderAll();
       },
       addCircle: () => {
         const object = new fabric.Circle({
@@ -286,10 +290,68 @@ export const useEditor = ({ clearSelectionCallback }: EditorHookProps) => {
 
         addToCanvas(object);
       },
-      addRows: () => {
-        const object = new fabric.Line();
+      addRows: (direction: "up" | "down" | "left" | "right" = "down") => {
+        console.log("strokeColor:", strokeColor, "strokeWidth:", strokeWidth);
 
-        addToCanvas(object);
+        let lineCoords: number[] = [0, 0, 0, 100]; // Ligne verticale par défaut (vers le bas)
+        let triangleLeft = 0;
+        let triangleTop = 100;
+        let triangleAngle = 180; // Triangle pointant vers le bas
+
+        if (direction === "up") {
+          lineCoords = [0, 0, 0, -100]; // Ligne verticale vers le haut
+          triangleLeft = 0;
+          triangleTop = -100;
+          triangleAngle = 0;
+        } else if (direction === "left") {
+          lineCoords = [0, 0, -100, 0]; // Ligne horizontale vers la gauche
+          triangleLeft = -100;
+          triangleTop = 0;
+          triangleAngle = -90;
+        } else if (direction === "right") {
+          lineCoords = [0, 0, 100, 0]; // Ligne horizontale vers la droite
+          triangleLeft = 100;
+          triangleTop = 0;
+          triangleAngle = 90;
+        }
+
+        const line = new fabric.Line(lineCoords, {
+          stroke: strokeColor || "#000000",
+          strokeWidth: strokeWidth || 2,
+          strokeDashArray: strokeDashArray,
+          selectable: true,
+          hasControls: true,
+          originX: "center",
+          originY: "center",
+        });
+
+        const triangle = new fabric.Triangle({
+          width: 15,
+          height: 20,
+          fill: strokeColor || "#000000",
+          left: triangleLeft,
+          top: triangleTop,
+          angle: triangleAngle,
+          selectable: false,
+          originX: "center",
+          originY: "center",
+        });
+
+        const arrow = new fabric.Group([line, triangle], {
+          left: 0,
+          top: 0,
+          selectable: true,
+          hasControls: true,
+          hasRotatingPoint: true,
+          lockRotation: false,
+          rotatingPointOffset: 40,
+          originX: "center",
+          originY: "center", // Centrer l'origine du groupe
+        });
+
+        console.log("Arrow created:", arrow);
+        addToCanvas(arrow);
+        canvas.renderAll();
       },
       getActiveOpacity: () => {
         const selectedObject = selectedObjects[0];

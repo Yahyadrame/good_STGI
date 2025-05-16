@@ -259,7 +259,7 @@ export interface Editor {
   addSoftRetangle: () => void;
   addRetangle: () => void;
   addTriangle: () => void;
-  addRows: () => void;
+  addRows: (direction?: "up" | "down" | "left" | "right") => void;
   getActiveFillColor: () => string;
   getActiveFontFamily: () => string;
   getActiveStrokeColor: () => string;
