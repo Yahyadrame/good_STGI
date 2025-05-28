@@ -16,6 +16,7 @@ const nextConfig = {
       },
     ],
   },
+  revalidate: 10,
 };
 
 export default nextConfig;

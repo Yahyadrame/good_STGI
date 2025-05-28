@@ -1,4 +1,4 @@
-"use client";
+"use client"; // Add this at the top
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useEditor } from "../hooks/use-editor";
@@ -21,49 +21,58 @@ import { RemoveBgSidebar } from "./remove-bg-sidebar";
 import { AiSidebar } from "./ai-sidebar";
 import { DrawSidebar } from "./draw-sidebar";
 import { SettingsSidebar } from "./settings-sidebar";
+import { useRouter, useSearchParams, useParams } from "next/navigation";
+import { useUploadThing } from "../../../../lib/uploadthing"; // Ajuste le chemin selon ton projet
 
 export const Editor = () => {
   const [activeTool, setActiveTool] = useState<ActiveTool>("select");
-
-  const onClearSelection = useCallback(() => {
-    if (selectionDependentTools.includes(activeTool)) {
-      setActiveTool("select");
-    }
-  }, [activeTool]);
-
   const { init, editor } = useEditor({
-    clearSelectionCallback: onClearSelection,
+    clearSelectionCallback: () => {
+      if (selectionDependentTools.includes(activeTool)) {
+        setActiveTool("select");
+      }
+    },
   });
   const onChangeActiveTool = useCallback(
     (tool: ActiveTool) => {
       if (tool === "draw") {
-        console.log("draw");
         editor?.enabledDrawingMode();
       }
-
       if (activeTool === "draw") {
         editor?.disabledDrawingMode();
       }
-
       if (tool === activeTool) {
         return setActiveTool("select");
       }
-
       setActiveTool(tool);
     },
     [activeTool, editor]
   );
   const canvasRef = useRef(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const params = useParams();
+
+  const { startUpload } = useUploadThing("imageUploader", {
+    onClientUploadComplete: (res) => {
+      console.log("Upload completed:", res);
+    },
+    onUploadError: (error) => {
+      console.error("Upload error:", error);
+    },
+    onUploadBegin: ({ file }) => {
+      console.log("Upload has begun for", file);
+    },
+  });
 
   useEffect(() => {
     const canvas = new fabric.Canvas(canvasRef.current, {
       controlsAboveOverlay: true,
       preserveObjectStacking: true,
-      enableRetinaScaling: true, // Améliore la netteté
-      uniScaleTransform: false, // Permet une rotation libre
-      rotatingPointOffset: 40, // Positionne la poignée de rotation
+      enableRetinaScaling: true,
+      uniScaleTransform: false,
+      rotatingPointOffset: 40,
     });
     init({
       initialCanvas: canvas,
@@ -74,6 +83,70 @@ export const Editor = () => {
       canvas.dispose();
     };
   }, [init]);
+
+  const handleSaveImage = async () => {
+    if (editor?.canvas) {
+      console.log("Starting save image process");
+      const dataUrl = editor.canvas.toDataURL({
+        format: "png",
+        quality: 0.8,
+      });
+      console.log("Data URL generated:", dataUrl.substring(0, 50) + "..."); // Log premiers caractères
+      const instructionId = params?.id || searchParams.get("instructionId");
+      const returnTo =
+        searchParams.get("returnTo") ||
+        `/instructions/${instructionId}/steps/new`;
+
+      try {
+        console.log("Converting to blob...");
+        const response = await fetch(dataUrl);
+        const blob = await response.blob();
+        const file = new File([blob], "canvas-image.png", {
+          type: "image/png",
+        });
+        console.log("File created, starting upload...");
+
+        const uploadResult = await startUpload([file]);
+        console.log("Upload result:", uploadResult);
+        if (!uploadResult || !uploadResult[0]?.url) {
+          throw new Error("Échec du téléversement de l'image avec UploadThing");
+        }
+
+        const imageUrl = uploadResult[0].url;
+        console.log("Image uploaded, URL:", imageUrl);
+
+        router.push(`${returnTo}?imageUrl=${encodeURIComponent(imageUrl)}`);
+      } catch (error) {
+        console.error("Erreur avec UploadThing:", error);
+        // Fallback : Utiliser l'ancienne méthode
+        try {
+          console.log("Falling back to direct POST...");
+          const fallbackResponse = await fetch(returnTo, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ imageUrl: dataUrl }),
+          });
+
+          if (fallbackResponse.ok) {
+            console.log("Fallback successful");
+            router.push(returnTo);
+          } else {
+            console.error(
+              "Erreur lors de l'envoi de l'image au serveur (fallback):",
+              fallbackResponse.statusText
+            );
+          }
+        } catch (fallbackError) {
+          console.error(
+            "Erreur lors de la requête POST (fallback):",
+            fallbackError
+          );
+        }
+      }
+    }
+  };
 
   return (
     <div className="flex h-full flex-col">
@@ -152,7 +225,6 @@ export const Editor = () => {
           activeTool={activeTool}
           onChangeActiveTool={onChangeActiveTool}
         />
-
         <main className="bg-muted flex-1 overflow-auto relative flex flex-col">
           <Toolbar
             editor={editor}
@@ -167,6 +239,12 @@ export const Editor = () => {
             <canvas ref={canvasRef} />
           </div>
           <Footer editor={editor} />
+          <button
+            onClick={handleSaveImage}
+            className="bg-green-500 text-white p-2 rounded-lg hover:bg-green-600 mt-4"
+          >
+            Sauvegarder l'image
+          </button>
         </main>
       </div>
     </div>
