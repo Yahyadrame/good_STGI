@@ -7,6 +7,7 @@ import { ShapeTool } from "./shape-tool";
 import { FaArrowDown, FaCircle, FaSquare, FaSquareFull } from "react-icons/fa";
 import { IoTriangle } from "react-icons/io5";
 import { FaDiamond } from "react-icons/fa6";
+import { useState } from "react";
 
 interface ShapeSidebarProps {
   editor: Editor | undefined;
@@ -23,6 +24,16 @@ export const ShapesSidebar = ({
     onChangeActiveTool("select");
   };
 
+  const [curvature, setCurvature] = useState(0.5); // Valeur initiale de courbure
+
+  const addCurvedArrowWithOptions = (
+    direction: "up" | "down" | "left" | "right"
+  ) => {
+    if (editor) {
+      editor.addCurvedArrow(direction, curvature);
+    }
+  };
+
   return (
     <aside
       className={cn(
@@ -35,23 +46,54 @@ export const ShapesSidebar = ({
         description="add shape to your canvas"
       />
       <ScrollArea>
-        <div className="grid grid-cols-3 gap-4 p-4">
-          <ShapeTool onClick={() => editor?.addCircle()} icon={FaCircle} />
-          <ShapeTool
-            onClick={() => editor?.addSoftRetangle()}
-            icon={FaSquare}
-          />
-          <ShapeTool
-            onClick={() => editor?.addRetangle()}
-            icon={FaSquareFull}
-          />
-          <ShapeTool onClick={() => editor?.addTriangle()} icon={IoTriangle} />
-          <ShapeTool
-            onClick={() => {}}
-            icon={FaDiamond}
-            iconClassName="rotate-180"
-          />
-          <ShapeTool onClick={() => editor?.addRows()} icon={FaArrowDown} />
+        <div className="p-4 space-y-4">
+          <div className="grid grid-cols-3 gap-4">
+            <ShapeTool onClick={() => editor?.addCircle()} icon={FaCircle} />
+            <ShapeTool
+              onClick={() => editor?.addSoftRetangle()}
+              icon={FaSquare}
+            />
+            <ShapeTool
+              onClick={() => editor?.addRetangle()}
+              icon={FaSquareFull}
+            />
+            <ShapeTool
+              onClick={() => editor?.addTriangle()}
+              icon={IoTriangle}
+            />
+            <ShapeTool
+              onClick={() => addCurvedArrowWithOptions("down")}
+              icon={FaArrowDown}
+              iconClassName="rotate-0"
+            />
+            <ShapeTool
+              onClick={() => addCurvedArrowWithOptions("up")}
+              icon={FaArrowDown}
+              iconClassName="rotate-180"
+            />
+            <ShapeTool
+              onClick={() => addCurvedArrowWithOptions("left")}
+              icon={FaArrowDown}
+              iconClassName="rotate-90"
+            />
+            <ShapeTool
+              onClick={() => addCurvedArrowWithOptions("right")}
+              icon={FaArrowDown}
+              iconClassName="rotate-270"
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Curvature</label>
+            <input
+              type="range"
+              min="-1"
+              max="1"
+              step="0.1"
+              value={curvature}
+              onChange={(e) => setCurvature(parseFloat(e.target.value))}
+              className="w-full"
+            />
+          </div>
         </div>
       </ScrollArea>
       <ToolSidebarClose onClick={onClose} />

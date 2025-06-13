@@ -13,13 +13,13 @@ import {
   Copy,
   SquareSplitHorizontal,
   Trash,
-  RotateCcw, // Ajouter cette icône
+  RotateCcw,
 } from "lucide-react";
 import { TbColorFilter } from "react-icons/tb";
 import { RxTransparencyGrid } from "react-icons/rx";
 import { isTextType } from "../../utils";
 import { FaBold, FaItalic, FaUnderline, FaStrikethrough } from "react-icons/fa";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { FontSizeInput } from "./font-size-input";
 
 interface ToolbarProps {
@@ -48,6 +48,14 @@ export const Toolbar = ({
 
   const initialFontWeight = editor?.getActiveFontWeight() || FONT_WEIGHT;
 
+  const getInitialBackgroundColor = () => {
+    if (editor?.canvas && editor.selectedObjects.length > 0 && isText) {
+      const activeObject = editor.canvas.getActiveObject();
+      return (activeObject as fabric.Textbox)?.backgroundColor || "#ffffff";
+    }
+    return "#ffffff";
+  };
+
   const [properties, setProperties] = useState({
     fillColor: initialFillColor,
     strokeColor: initialStrokeColor,
@@ -58,9 +66,53 @@ export const Toolbar = ({
     fontLineThrough: initialFontLineThrough,
     textAlign: initialTextAlign,
     fontSize: initialFontSize,
+    backgroundColor: getInitialBackgroundColor(),
   });
 
   const selectedObject = editor?.selectedObjects[0];
+
+  useEffect(() => {
+    if (!editor?.canvas) return;
+  
+    const updateProperties = () => {
+      if (editor.selectedObjects.length > 0) {
+        const activeObject = editor.canvas.getActiveObject();
+        if (activeObject) {
+          const strokeColor = activeObject.type === "group"
+            ? (activeObject.getObjects()[0] as fabric.Path).stroke || strokeColor
+            : editor.getActiveStrokeColor();
+          setProperties((current) => ({
+            ...current,
+            fillColor: editor.getActiveFillColor(),
+            strokeColor: strokeColor,
+            fontFamily: editor.getActiveFontFamily(),
+            fontWeight: editor.getActiveFontWeight() || FONT_WEIGHT,
+            fontStyle: editor.getActiveFontStyle(),
+            fontUnderline: editor.getActiveFontUnderline(),
+            fontLineThrough: editor.getActiveFontLineThrough(),
+            textAlign: editor.getActiveTextAlign(),
+            fontSize: editor.getActiveFontSize() || FONT_SIZE,
+            backgroundColor: activeObject.type === "textbox" ? (activeObject as fabric.Textbox).backgroundColor || "#ffffff" : "#ffffff",
+          }));
+        }
+      } else {
+        setProperties((current) => ({
+          ...current,
+          backgroundColor: "#ffffff",
+        }));
+      }
+    };
+  
+    editor.canvas.on("selection:created", updateProperties);
+    editor.canvas.on("selection:updated", updateProperties);
+    editor.canvas.on("object:modified", updateProperties);
+  
+    return () => {
+      editor.canvas.off("selection:created", updateProperties);
+      editor.canvas.off("selection:updated", updateProperties);
+      editor.canvas.off("object:modified", updateProperties);
+    };
+  }, [editor?.canvas, isText]);
 
   const onChangeFontSize = (value: number) => {
     if (!selectedObject) return;
@@ -95,7 +147,6 @@ export const Toolbar = ({
     if (!selectedObject) return;
 
     const newValue = properties.fontUnderline ? false : true;
-
     editor?.changeFontUnderline(newValue);
     setProperties((current) => ({ ...current, fontUnderline: newValue }));
   };
@@ -104,16 +155,20 @@ export const Toolbar = ({
     if (!selectedObject) return;
 
     const newValue = properties.fontLineThrough ? false : true;
-
     editor?.changeFontLineThrough(newValue);
     setProperties((current) => ({ ...current, fontLineThrough: newValue }));
   };
 
-  // Ajouter une fonction pour faire pivoter l'objet sélectionné
+  const changeBackgroundColor = (color: string) => {
+    if (!selectedObject || !isText) return;
+    editor?.changeBackgroundColor(color); // Utilisation de la méthode Editor
+    setProperties((current) => ({ ...current, backgroundColor: color }));
+  };
+
   const rotateObject = () => {
     const activeObject = editor?.canvas.getActiveObject();
     if (activeObject) {
-      activeObject.rotate((activeObject.angle || 0) + 15); // Rotation de 15 degrés
+      activeObject.rotate((activeObject.angle || 0) + 15);
       editor?.canvas.renderAll();
     }
   };
@@ -137,9 +192,7 @@ export const Toolbar = ({
             >
               <div
                 className="rounded-sm size-4 border-r"
-                style={{
-                  backgroundColor: properties.fillColor,
-                }}
+                style={{ backgroundColor: properties.fillColor }}
               />
             </Button>
           </Hint>
@@ -157,9 +210,7 @@ export const Toolbar = ({
             >
               <div
                 className="rounded-sm size-4 border-2 bg-white"
-                style={{
-                  borderColor: properties.strokeColor,
-                }}
+                style={{ borderColor: properties.strokeColor }}
               />
             </Button>
           </Hint>
@@ -356,11 +407,7 @@ export const Toolbar = ({
       </div>
       <div className="flex items-center h-full justify-center">
         <Hint label="Rotate Clockwise" side="bottom" sideOffset={5}>
-          <Button
-            onClick={rotateObject}
-            size="icon"
-            variant="ghost"
-          >
+          <Button onClick={rotateObject} size="icon" variant="ghost">
             <RotateCcw className="size-4" />
           </Button>
         </Hint>
@@ -398,6 +445,23 @@ export const Toolbar = ({
           </Button>
         </Hint>
       </div>
+      {isText && (
+        <div className="flex items-center h-full justify-center">
+          <Hint label="Text Box Color" side="bottom" sideOffset={5}>
+            <Button
+              onClick={() => onChangeActiveTool("text-box-color")}
+              size="icon"
+              variant="ghost"
+              className={cn(activeTool === "text-box-color" && "bg-gray-100")}
+            >
+              <div
+                className="rounded-sm size-4 border"
+                style={{ backgroundColor: properties.backgroundColor }}
+              />
+            </Button>
+          </Hint>
+        </div>
+      )}
     </div>
   );
 };

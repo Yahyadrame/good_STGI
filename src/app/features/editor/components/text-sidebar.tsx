@@ -1,9 +1,10 @@
+"use client";
+
 import { cn } from "@/lib/utils";
 import { ActiveTool, Editor } from "../../types";
 import { ToolSidebarHeader } from "./tool-sidebar-header";
 import { ToolSidebarClose } from "./tool-sidebar-close";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
 
 interface TextSidebarProps {
@@ -35,7 +36,7 @@ export const TextSidebar = ({
             className="w-full"
             onClick={() => editor?.addText("Hello World")}
           >
-            Add a textBox
+            Add a Textbox
           </Button>
           <Button
             className="w-full h-16"

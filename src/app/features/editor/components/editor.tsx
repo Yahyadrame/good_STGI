@@ -1,4 +1,4 @@
-"use client"; // Add this at the top
+"use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useEditor } from "../hooks/use-editor";
@@ -14,6 +14,7 @@ import { StrokeColorSidebar } from "./stroke-color-sidebar";
 import { StrokWidthSidebar } from "./stroke-width-sidebar";
 import { OpacitySidebar } from "./opacity-sidebar";
 import { TextSidebar } from "./text-sidebar";
+import{TextBoxColorSidebar} from"./TextBoxColorSidebar";
 import { FontSidebar } from "./font-sidebar";
 import { ImageSidebar } from "./image-sidebar";
 import { FilterSidebar } from "./filter-sidebar";
@@ -22,7 +23,7 @@ import { AiSidebar } from "./ai-sidebar";
 import { DrawSidebar } from "./draw-sidebar";
 import { SettingsSidebar } from "./settings-sidebar";
 import { useRouter, useSearchParams, useParams } from "next/navigation";
-import { useUploadThing } from "../../../../lib/uploadthing"; // Ajuste le chemin selon ton projet
+import { useUploadThing } from "../../../../lib/uploadthing";
 
 export const Editor = () => {
   const [activeTool, setActiveTool] = useState<ActiveTool>("select");
@@ -67,6 +68,8 @@ export const Editor = () => {
   });
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+
     const canvas = new fabric.Canvas(canvasRef.current, {
       controlsAboveOverlay: true,
       preserveObjectStacking: true,
@@ -85,65 +88,65 @@ export const Editor = () => {
   }, [init]);
 
   const handleSaveImage = async () => {
-    if (editor?.canvas) {
-      console.log("Starting save image process");
-      const dataUrl = editor.canvas.toDataURL({
-        format: "png",
-        quality: 0.8,
+    if (!editor?.canvas) return;
+
+    console.log("Starting save image process");
+    const dataUrl = editor.canvas.toDataURL({
+      format: "png",
+      quality: 0.8,
+    });
+    console.log("Data URL generated:", dataUrl.substring(0, 50) + "...");
+    const instructionId = params?.id || searchParams.get("instructionId");
+    if (!instructionId) {
+      console.error("No instructionId found, aborting save");
+      return;
+    }
+    const returnTo =
+      searchParams.get("returnTo") ||
+      `/instructions/${instructionId}/steps/new`;
+
+    try {
+      console.log("Converting to blob...");
+      const response = await fetch(dataUrl);
+      const blob = await response.blob();
+      const file = new File([blob], "canvas-image.png", {
+        type: "image/png",
       });
-      console.log("Data URL generated:", dataUrl.substring(0, 50) + "..."); // Log premiers caractères
-      const instructionId = params?.id || searchParams.get("instructionId");
-      const returnTo =
-        searchParams.get("returnTo") ||
-        `/instructions/${instructionId}/steps/new`;
+      console.log("File created, starting upload...");
 
+      const uploadResult = await startUpload([file]);
+      console.log("Upload result:", uploadResult);
+      if (!uploadResult || !uploadResult[0]?.url) {
+        throw new Error("Échec du téléversement de l'image avec UploadThing");
+      }
+
+      const imageUrl = uploadResult[0].url;
+      console.log("Image uploaded, URL:", imageUrl);
+
+      router.push(`${returnTo}?imageUrl=${encodeURIComponent(imageUrl)}`);
+    } catch (error) {
+      console.error("Erreur avec UploadThing:", error);
       try {
-        console.log("Converting to blob...");
-        const response = await fetch(dataUrl);
-        const blob = await response.blob();
-        const file = new File([blob], "canvas-image.png", {
-          type: "image/png",
+        console.log("Falling back to direct POST...");
+        const fallbackResponse = await fetch(returnTo, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ imageUrl: dataUrl }),
         });
-        console.log("File created, starting upload...");
 
-        const uploadResult = await startUpload([file]);
-        console.log("Upload result:", uploadResult);
-        if (!uploadResult || !uploadResult[0]?.url) {
-          throw new Error("Échec du téléversement de l'image avec UploadThing");
-        }
-
-        const imageUrl = uploadResult[0].url;
-        console.log("Image uploaded, URL:", imageUrl);
-
-        router.push(`${returnTo}?imageUrl=${encodeURIComponent(imageUrl)}`);
-      } catch (error) {
-        console.error("Erreur avec UploadThing:", error);
-        // Fallback : Utiliser l'ancienne méthode
-        try {
-          console.log("Falling back to direct POST...");
-          const fallbackResponse = await fetch(returnTo, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ imageUrl: dataUrl }),
-          });
-
-          if (fallbackResponse.ok) {
-            console.log("Fallback successful");
-            router.push(returnTo);
-          } else {
-            console.error(
-              "Erreur lors de l'envoi de l'image au serveur (fallback):",
-              fallbackResponse.statusText
-            );
-          }
-        } catch (fallbackError) {
+        if (fallbackResponse.ok) {
+          console.log("Fallback successful");
+          router.push(returnTo);
+        } else {
           console.error(
-            "Erreur lors de la requête POST (fallback):",
-            fallbackError
+            "Erreur lors de l'envoi de l'image au serveur (fallback):",
+            fallbackResponse.statusText
           );
         }
+      } catch (fallbackError) {
+        console.error("Erreur lors de la requête POST (fallback):", fallbackError);
       }
     }
   };
@@ -225,12 +228,16 @@ export const Editor = () => {
           activeTool={activeTool}
           onChangeActiveTool={onChangeActiveTool}
         />
+        <TextBoxColorSidebar
+          editor={editor}
+          activeTool={activeTool}
+          onChangeActiveTool={onChangeActiveTool}
+        />
         <main className="bg-muted flex-1 overflow-auto relative flex flex-col">
           <Toolbar
             editor={editor}
             activeTool={activeTool}
             onChangeActiveTool={onChangeActiveTool}
-            key={JSON.stringify(editor?.canvas.getActiveObject())}
           />
           <div
             className="flex-1 h-[calc(100%-124px)] bg-muted"
@@ -250,3 +257,5 @@ export const Editor = () => {
     </div>
   );
 };
+
+export default Editor;

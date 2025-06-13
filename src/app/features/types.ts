@@ -85,7 +85,9 @@ export type ActiveTool =
   | "settings"
   | "ai"
   | "remove-bg"
-  | "templates";
+  | "templates"
+  | "textRich"
+  | "arrow";
 
 export const fonts = [
   "Ariar",
@@ -145,7 +147,7 @@ export const FILL_COLORS = "rgba(0,0,0,1)";
 export const STROKE_COLOR = "rgba(0,0,0,1)";
 export const STROKE_WIDTH = 2;
 export const STROKE_DASH_ARRAY = [];
-export const FONT_SIZE = 16;
+export const FONT_SIZE = 46;
 export const FONT_FAMILY = "Arial";
 export const FONT_WEIGHT = 500;
 
@@ -250,6 +252,7 @@ export interface Editor {
   bringForward: () => void;
   sendBackward: () => void;
   changeFillColor: (value: string) => void;
+  changeBackgroundColor: (value: string) => void; // Nouvelle méthode
   changeStrokeColor: (value: string) => void;
   changeStrokeWidth: (value: number) => void;
   changeStrokeDashArray: (value: number[]) => void;
@@ -259,6 +262,7 @@ export interface Editor {
   addSoftRetangle: () => void;
   addRetangle: () => void;
   addTriangle: () => void;
+  addCurvedArrow: () => void;
   addRows: (direction?: "up" | "down" | "left" | "right") => void;
   getActiveFillColor: () => string;
   getActiveFontFamily: () => string;

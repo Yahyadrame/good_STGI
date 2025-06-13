@@ -135,7 +135,6 @@ export const useEditor = ({ clearSelectionCallback }: EditorHookProps) => {
       if (!center) return;
       // @ts-ignore
       canvas._centerObject(object, center);
-      // canvas.centerObject(object);
     };
 
     const addToCanvas = (object: fabric.Object) => {
@@ -237,16 +236,19 @@ export const useEditor = ({ clearSelectionCallback }: EditorHookProps) => {
         canvas.renderAll();
       },
       addText: (value, options) => {
-        const object = new fabric.IText(value, {
+        console.log("Adding textbox with value:", value); // Log pour confirmer la création
+        const object = new fabric.Textbox(value, {
           ...TEXT_OPTIONS,
           fill: fillColor,
-          editable: true, // Assure que le texte est éditable
+          editable: true,
+          padding: 10, // Padding pour rendre le fond visible
+          backgroundColor: "#ffffff", // Couleur initiale par défaut
           ...options,
         });
 
         addToCanvas(object);
-        object.enterEditing(); // Active le mode édition
-        object.selectAll(); // Sélectionne tout le texte pour faciliter la modification
+        object.enterEditing();
+        object.selectAll();
         canvas.renderAll();
       },
       addCircle: () => {
@@ -290,26 +292,175 @@ export const useEditor = ({ clearSelectionCallback }: EditorHookProps) => {
 
         addToCanvas(object);
       },
-      addRows: (direction: "up" | "down" | "left" | "right" = "down") => {
-        console.log("strokeColor:", strokeColor, "strokeWidth:", strokeWidth);
+      // Dans useEditor.ts, ajoutez cette méthode dans l'objet retourné par buildEditor
+      addCurvedArrow: () => {
+        const controlPointOffset = 100; // Distance de la courbe
+        const arrowLength = 150; // Longueur totale de la flèche
+        const headSize = 15; // Taille de la tête
 
-        let lineCoords: number[] = [0, 0, 0, 100]; // Ligne verticale par défaut (vers le bas)
+        // Définir les points pour une courbe simple (quadratique)
+        const startX = 0;
+        const startY = 0;
+        const controlX = controlPointOffset;
+        const controlY = -controlPointOffset;
+        const endX = arrowLength;
+        const endY = 0;
+
+        // Chemin SVG pour la courbe (utilisation d'une courbe quadratique)
+        const curvePath = `M ${startX} ${startY} Q ${controlX} ${controlY}, ${endX} ${endY}`;
+        const curve = new fabric.Path(curvePath, {
+          stroke: strokeColor || "#000000",
+          strokeWidth: strokeWidth || 2,
+          strokeDashArray: strokeDashArray,
+          fill: "",
+          selectable: true,
+          hasControls: true,
+          originX: "center",
+          originY: "center",
+        });
+
+        // Créer la tête de la flèche (triangle)
+        const head = new fabric.Triangle({
+          width: headSize,
+          height: headSize * 1.5,
+          fill: strokeColor || "#000000",
+          left: endX,
+          top: endY,
+          angle: 0, // Ajuster l'angle en fonction de la direction
+          originX: "center",
+          originY: "center",
+          selectable: false,
+        });
+
+        // Ajuster la position et l'angle de la tête pour suivre la courbe
+        const angle =
+          Math.atan2(endY - controlY, endX - controlX) * (180 / Math.PI) + 90;
+        head.set({ angle: angle });
+
+        // Grouper la courbe et la tête
+        const curvedArrow = new fabric.Group([curve, head], {
+          left: 0,
+          top: 0,
+          selectable: true,
+          hasControls: true,
+          hasRotatingPoint: true,
+          lockRotation: false,
+          rotatingPointOffset: 40,
+          originX: "center",
+          originY: "center",
+        });
+
+        addToCanvas(curvedArrow);
+        canvas.renderAll();
+      }, // Dans useEditor.ts, remplacez la méthode addCurvedArrow par celle-ci
+      addCurvedArrow: (
+        direction: "up" | "down" | "left" | "right" = "down",
+        curvature: number = 0.5
+      ) => {
+        const controlPointOffset = 100 * curvature; // Ajuste la courbure en fonction du paramètre
+        const arrowLength = 150; // Longueur totale de la flèche
+        const headSize = 15; // Taille de la tête
+
+        // Points de départ et contrôle en fonction de la direction
+        let startX = 0,
+          startY = 0,
+          controlX = 0,
+          controlY = 0,
+          endX = 0,
+          endY = 0;
+        let headAngle = 0;
+
+        switch (direction) {
+          case "up":
+            endX = 0;
+            endY = -arrowLength;
+            controlX = controlPointOffset * (curvature > 0 ? 1 : -1);
+            controlY = -controlPointOffset * Math.abs(curvature);
+            headAngle = 0;
+            break;
+          case "down":
+            endX = 0;
+            endY = arrowLength;
+            controlX = controlPointOffset * (curvature > 0 ? 1 : -1);
+            controlY = controlPointOffset * Math.abs(curvature);
+            headAngle = 180;
+            break;
+          case "left":
+            endX = -arrowLength;
+            endY = 0;
+            controlX = -controlPointOffset * Math.abs(curvature);
+            controlY = controlPointOffset * (curvature > 0 ? -1 : 1);
+            headAngle = -90;
+            break;
+          case "right":
+            endX = arrowLength;
+            endY = 0;
+            controlX = controlPointOffset * Math.abs(curvature);
+            controlY = controlPointOffset * (curvature > 0 ? -1 : 1);
+            headAngle = 90;
+            break;
+        }
+
+        // Chemin SVG pour la courbe quadratique
+        const curvePath = `M ${startX} ${startY} Q ${controlX} ${controlY}, ${endX} ${endY}`;
+        const curve = new fabric.Path(curvePath, {
+          stroke: strokeColor || "#000000",
+          strokeWidth: strokeWidth || 2,
+          strokeDashArray: strokeDashArray,
+          fill: "",
+          selectable: true,
+          hasControls: true,
+          originX: "center",
+          originY: "center",
+        });
+
+        // Créer la tête de la flèche
+        const head = new fabric.Triangle({
+          width: headSize,
+          height: headSize * 1.5,
+          fill: strokeColor || "#000000",
+          left: endX,
+          top: endY,
+          angle: headAngle,
+          originX: "center",
+          originY: "center",
+          selectable: false,
+        });
+
+        // Grouper la courbe et la tête
+        const curvedArrow = new fabric.Group([curve, head], {
+          left: 0,
+          top: 0,
+          selectable: true,
+          hasControls: true,
+          hasRotatingPoint: true,
+          lockRotation: false,
+          rotatingPointOffset: 40,
+          originX: "center",
+          originY: "center",
+        });
+
+        addToCanvas(curvedArrow);
+        canvas.renderAll();
+      },
+      addRows: (direction: "up" | "down" | "left" | "right" = "down") => {
+        let lineCoords: number[] = [0, 0, 0, 100];
         let triangleLeft = 0;
         let triangleTop = 100;
-        let triangleAngle = 180; // Triangle pointant vers le bas
+        let triangleAngle = 180;
 
         if (direction === "up") {
-          lineCoords = [0, 0, 0, -100]; // Ligne verticale vers le haut
+          lineCoords = [0, 0, 0, -100];
           triangleLeft = 0;
           triangleTop = -100;
           triangleAngle = 0;
         } else if (direction === "left") {
-          lineCoords = [0, 0, -100, 0]; // Ligne horizontale vers la gauche
+          lineCoords = [0, 0, -100, 0];
           triangleLeft = -100;
           triangleTop = 0;
           triangleAngle = -90;
         } else if (direction === "right") {
-          lineCoords = [0, 0, 100, 0]; // Ligne horizontale vers la droite
+          lineCoords = [0, 0, 100, 0];
           triangleLeft = 100;
           triangleTop = 0;
           triangleAngle = 90;
@@ -346,10 +497,9 @@ export const useEditor = ({ clearSelectionCallback }: EditorHookProps) => {
           lockRotation: false,
           rotatingPointOffset: 40,
           originX: "center",
-          originY: "center", // Centrer l'origine du groupe
+          originY: "center",
         });
 
-        console.log("Arrow created:", arrow);
         addToCanvas(arrow);
         canvas.renderAll();
       },
@@ -366,7 +516,6 @@ export const useEditor = ({ clearSelectionCallback }: EditorHookProps) => {
         objects.forEach((object) => {
           if (isTextType(object.type)) {
             // @ts-ignore
-            // c'est la faute de la lib
             object.set({ fontWeight: value });
           }
         });
@@ -386,7 +535,6 @@ export const useEditor = ({ clearSelectionCallback }: EditorHookProps) => {
         objects.forEach((object) => {
           if (isTextType(object.type)) {
             // @ts-ignore
-            // c'est la faute de la lib
             object.set({ fontStyle: value });
           }
         });
@@ -406,14 +554,12 @@ export const useEditor = ({ clearSelectionCallback }: EditorHookProps) => {
         objects.forEach((object) => {
           if (isTextType(object.type)) {
             // @ts-ignore
-            // c'est la faute de la lib
             object.set({ linethrough: value });
           }
         });
 
         canvas.renderAll();
       },
-
       getActiveTextAlign: () => {
         const selectedObject = selectedObjects[0];
         if (!selectedObject) return "left";
@@ -427,7 +573,6 @@ export const useEditor = ({ clearSelectionCallback }: EditorHookProps) => {
         objects.forEach((object) => {
           if (isTextType(object.type)) {
             // @ts-ignore
-            // c'est la faute de la lib
             object.set({ textAlign: value });
           }
         });
@@ -447,7 +592,6 @@ export const useEditor = ({ clearSelectionCallback }: EditorHookProps) => {
         objects.forEach((object) => {
           if (isTextType(object.type)) {
             // @ts-ignore
-            // c'est la faute de la lib
             object.set({ fontSize: value });
           }
         });
@@ -462,13 +606,11 @@ export const useEditor = ({ clearSelectionCallback }: EditorHookProps) => {
 
         return value;
       },
-
       changeFontUnderline: (value: boolean) => {
         const objects = canvas.getActiveObjects();
         objects.forEach((object) => {
           if (isTextType(object.type)) {
             // @ts-ignore
-            // c'est la faute de la lib
             object.set({ underline: value });
           }
         });
@@ -508,12 +650,26 @@ export const useEditor = ({ clearSelectionCallback }: EditorHookProps) => {
         const objects = canvas.getActiveObjects();
         objects.forEach((object) => {
           object.set({ fill: value });
-          console.log(object);
         });
 
         canvas.renderAll();
       },
-
+      changeBackgroundColor: (value: string) => {
+        console.log("changeBackgroundColor called with value:", value); // Log pour confirmer l'appel
+        const activeObject = canvas.getActiveObject();
+        if (activeObject && isTextType(activeObject.type)) {
+          // @ts-ignore
+          activeObject.set({
+            backgroundColor: value,
+            transparentCorners: false,
+          });
+          console.log("Applied backgroundColor:", value, "to", activeObject); // Log pour débogage
+          canvas.renderAll();
+          canvas.requestRenderAll(); // Force un nouveau rendu
+        } else {
+          console.log("No active text object or object is not a textbox");
+        }
+      },
       changeFontFamily: (value: string) => {
         setFontFamily(value);
         const objects = canvas.getActiveObjects();
@@ -526,39 +682,60 @@ export const useEditor = ({ clearSelectionCallback }: EditorHookProps) => {
 
         canvas.renderAll();
       },
-
       changeStrokeColor: (value: string) => {
         setStrokeColor(value);
         const objects = canvas.getActiveObjects();
         objects.forEach((object) => {
-          if (isTextType(object.type)) {
+          if (object.type === "group") {
+            object.getObjects().forEach((groupObject) => {
+              if (groupObject.type === "path" || groupObject.type === "triangle") {
+                groupObject.set({ stroke: value });
+              }
+            });
+          } else if (isTextType(object.type)) {
             object.set({ stroke: value });
-            return;
+          } else {
+            object.set({ stroke: value });
           }
-          object.set({ stroke: value });
         });
         canvas.freeDrawingBrush.color = value;
         canvas.renderAll();
       },
+      
       changeStrokeWidth: (value: number) => {
         setStrokeWidth(value);
         const objects = canvas.getActiveObjects();
         objects.forEach((object) => {
-          object.set({ strokeWidth: value });
+          if (object.type === "group") {
+            object.getObjects().forEach((groupObject) => {
+              if (groupObject.type === "path" || groupObject.type === "triangle") {
+                groupObject.set({ strokeWidth: value });
+              }
+            });
+          } else {
+            object.set({ strokeWidth: value });
+          }
         });
         canvas.freeDrawingBrush.width = value;
         canvas.renderAll();
       },
+      
       changeStrokeDashArray: (value: number[]) => {
         setStrokeDashArray(value);
         const objects = canvas.getActiveObjects();
         objects.forEach((object) => {
-          object.set({ strokeDashArray: value });
+          if (object.type === "group") {
+            object.getObjects().forEach((groupObject) => {
+              if (groupObject.type === "path" || groupObject.type === "triangle") {
+                groupObject.set({ strokeDashArray: value });
+              }
+            });
+          } else {
+            object.set({ strokeDashArray: value });
+          }
         });
-
         canvas.renderAll();
       },
-
       canvas,
       getActiveFontWeight: () => {
         const selectedObject = selectedObjects[0];

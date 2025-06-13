@@ -9,6 +9,8 @@ import {
   Shapes,
   Sparkles,
   Type,
+  FileText,
+  ArrowRight,
 } from "lucide-react";
 import { SideBartItem } from "./Sidebar-item";
 import { ActiveTool } from "../../types";
@@ -54,6 +56,8 @@ export const SideBar = ({ activeTool, onChangeActiveTool }: SideBarProps) => {
             onChangeActiveTool("shapes");
           }}
         />
+        
+        
         <SideBartItem
           icon={Sparkles}
           label="AI"
