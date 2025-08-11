@@ -1,4 +1,4 @@
-import { useCallback, useState, useMemo } from "react";
+import { useCallback, useState, useMemo, useEffect } from "react";
 import { fabric } from "fabric";
 import { useAutoResize } from "./use-auto-resize";
 import {
@@ -6,7 +6,7 @@ import {
   CIRCLE_OPTIONS,
   Editor,
   FILL_COLORS,
-  RECTAGNLE_OPTIONS,
+  RECTANGLE_OPTIONS,
   STROKE_COLOR,
   STROKE_WIDTH,
   EditorHookProps,
@@ -25,9 +25,8 @@ import {
   transformText,
 } from "../../utils";
 import { useClipboard } from "./use-clipboard";
-import { useHistory } from "./use-hitory";
-import { useHotkeys } from "./use-hotKeys";
-import { useWindowEvents } from "./use-window-events";
+import { useHistory } from "./use-history";
+import { useHotkeys } from "./use-hotkeys";
 
 export const useEditor = ({ clearSelectionCallback }: EditorHookProps) => {
   const [fontFamily, setFontFamily] = useState(FONT_FAMILY);
@@ -37,13 +36,21 @@ export const useEditor = ({ clearSelectionCallback }: EditorHookProps) => {
   const [fillColor, setFillColor] = useState(FILL_COLORS);
   const [strokeColor, setStrokeColor] = useState(STROKE_COLOR);
   const [strokeWidth, setStrokeWidth] = useState(STROKE_WIDTH);
-  const [strokeDashArray, setStrokeDashArray] =
-    useState<number[]>(STROKE_DASH_ARRAY);
+  const [strokeDashArray, setStrokeDashArray] = useState<number[]>(STROKE_DASH_ARRAY);
 
-  useWindowEvents();
-  const { save, canRedo, canUndo, canvasHistory, redo, undo, setHistoryIndex } =
-    useHistory({ canvas });
+  const { save, canRedo, canUndo, canvasHistory, redo, undo, setHistoryIndex } = useHistory({ canvas });
 
+
+  useHotkeys({
+    canvas,
+    copy: () => copy(),
+    paste: () => paste(),
+    redo,
+    save,
+    undo,
+  });
+
+  
   const buildEditor = ({
     undo,
     redo,
@@ -67,7 +74,11 @@ export const useEditor = ({ clearSelectionCallback }: EditorHookProps) => {
     setFontFamily,
   }: BuildEditorProps): Editor => {
     const generateSaveOptions = () => {
-      const { width, height, left, top } = getWorkspace() as fabric.Rect;
+      const workspace = getWorkspace() as fabric.Rect;
+      if (!workspace) {
+        throw new Error("Workspace not found");
+      }
+      const { width, height, left, top } = workspace;
 
       return {
         name: "Image",
@@ -81,66 +92,119 @@ export const useEditor = ({ clearSelectionCallback }: EditorHookProps) => {
     };
 
     const saveAsPng = () => {
+      if (!canvas) return;
       const options = generateSaveOptions();
       canvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
       const dataURL = canvas.toDataURL(options);
-
       downloadFile(dataURL, "png");
       autoZoom();
     };
 
     const saveAsSvg = () => {
+      if (!canvas) return;
       const options = generateSaveOptions();
       canvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
-      const dataURL = canvas.toDataURL(options);
-
+      const dataURL = canvas.toDataURL({ ...options, format: "svg" });
       downloadFile(dataURL, "svg");
       autoZoom();
     };
 
     const saveAsJpg = () => {
+      if (!canvas) return;
       const options = generateSaveOptions();
       canvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
-      const dataURL = canvas.toDataURL(options);
-
+      const dataURL = canvas.toDataURL({ ...options, format: "jpeg" });
       downloadFile(dataURL, "jpg");
       autoZoom();
     };
 
     const saveAsJson = async () => {
-      const dataURL = canvas.toJSON(JSON_KEYS);
-      await transformText(dataURL.objects);
+      if (!canvas) return;
+      const data = canvas.toJSON(JSON_KEYS);
+      await transformText(data.objects);
       const fileString = `data:text/json;charset=utf-8,${encodeURIComponent(
-        JSON.stringify(dataURL, null, "\t")
+        JSON.stringify(data, null, "\t")
       )}`;
       downloadFile(fileString, "json");
     };
 
     const loadJson = async (json: string) => {
+      if (!canvas) return;
       const data = JSON.parse(json);
-
       canvas.loadFromJSON(data, () => {
         autoZoom();
       });
     };
 
     const getWorkspace = () => {
-      return canvas.getObjects().find((object) => object.name === "clip");
+      return canvas?.getObjects().find((object) => object.name === "clip");
     };
 
     const center = (object: fabric.Object) => {
       const workspace = getWorkspace();
       const center = workspace?.getCenterPoint();
-
-      if (!center) return;
-      // @ts-ignore
-      canvas._centerObject(object, center);
+      if (center && workspace && canvas) {
+        canvas._centerObject(object, center);
+      }
     };
 
     const addToCanvas = (object: fabric.Object) => {
+      if (!canvas) return;
       center(object);
       canvas.add(object);
       canvas.setActiveObject(object);
+      save();
+    };
+
+    const addText = (value: string, options?: Partial<fabric.ITextboxOptions>) => {
+      if (!canvas) return;
+      const object = new fabric.Textbox(value, {
+        ...TEXT_OPTIONS,
+        fill: fillColor,
+        editable: true,
+        padding: 10,
+        backgroundColor: "#ffffff",
+        ...options,
+      });
+      addToCanvas(object);
+      object.enterEditing();
+      object.selectAll();
+      canvas.renderAll();
+    };
+
+    const addVideoAnnotation = (text: string) => {
+      if (!canvas) return;
+      const textObj = new fabric.Textbox(text, {
+        ...TEXT_OPTIONS,
+        left: 50,
+        top: 50,
+        width: 200,
+        fontSize: 20,
+        fill: "#ffffff",
+        stroke: "#000000",
+        strokeWidth: 1,
+        editable: true,
+      });
+      addToCanvas(textObj);
+    };
+
+    const cropVideo = (cropArea: { x: number; y: number; width: number; height: number }) => {
+      if (!canvas) return;
+      const objects = canvas.getActiveObjects();
+      const videoObj = objects.find((obj) => obj.type === "image" && (obj as any).isVideo);
+      if (videoObj) {
+        videoObj.set({
+          clipPath: new fabric.Rect({
+            left: cropArea.x,
+            top: cropArea.y,
+            width: cropArea.width,
+            height: cropArea.height,
+            absolutePositioned: true,
+          }),
+        });
+        canvas.renderAll();
+        save();
+      }
     };
 
     return {
@@ -151,22 +215,20 @@ export const useEditor = ({ clearSelectionCallback }: EditorHookProps) => {
       loadJson,
       autoZoom,
       zoomIn: () => {
+        if (!canvas) return;
         let zoomRatio = canvas.getZoom();
-
         zoomRatio += 0.5;
         const center = canvas.getCenter();
-
         canvas.zoomToPoint(
           new fabric.Point(center.left, center.top),
           zoomRatio > 1 ? 1 : zoomRatio
         );
       },
       zoomOut: () => {
+        if (!canvas) return;
         let zoomRatio = canvas.getZoom();
-
         zoomRatio -= 0.5;
         const center = canvas.getCenter();
-
         canvas.zoomToPoint(
           new fabric.Point(center.left, center.top),
           zoomRatio < 0.2 ? 0.2 : zoomRatio
@@ -175,22 +237,28 @@ export const useEditor = ({ clearSelectionCallback }: EditorHookProps) => {
       getWorkspace,
       changeSize: (value: { width: number; height: number }) => {
         const workspace = getWorkspace();
-        workspace?.set(value);
-        autoZoom();
-        save();
+        if (workspace && canvas) {
+          workspace.set(value);
+          autoZoom();
+          save();
+        }
       },
       changeBackgroundWorkspace: (value: string) => {
         const workspace = getWorkspace();
-        workspace?.set({ fill: value });
-        canvas.renderAll();
-        save();
+        if (workspace && canvas) {
+          workspace.set({ fill: value });
+          canvas.renderAll();
+          save();
+        }
       },
       enabledDrawingMode: () => {
+        if (!canvas) return;
         canvas.discardActiveObject();
         canvas.renderAll();
         canvas.isDrawingMode = true;
       },
       disabledDrawingMode: () => {
+        if (!canvas) return;
         canvas.isDrawingMode = false;
       },
       onRedo: () => redo(),
@@ -200,58 +268,45 @@ export const useEditor = ({ clearSelectionCallback }: EditorHookProps) => {
       onCopy: () => copy(),
       onPaste: () => paste(),
       changeImageFilter: (value: string) => {
+        if (!canvas) return;
         const objects = canvas.getActiveObjects();
         objects.forEach((object) => {
           if (object.type === "image") {
             const imageObject = object as fabric.Image;
             const effect = createFilter(value);
-
             imageObject.filters = effect ? [effect] : [];
             imageObject.applyFilters();
             canvas.renderAll();
           }
         });
+        save();
       },
       addImage: (url: string) => {
+        if (!canvas) return;
         fabric.Image.fromURL(
           url,
           (image) => {
             const workspace = getWorkspace();
-            image.scaleToWidth(workspace?.width || 0);
-            image.scaleToHeight(workspace?.height || 0);
-
-            addToCanvas(image);
+            if (workspace) {
+              image.scaleToWidth(workspace.width / 2);
+              image.scaleToHeight(workspace.height / 2);
+              addToCanvas(image);
+            }
           },
-          {
-            crossOrigin: "anonymous",
-          }
+          { crossOrigin: "anonymous" }
         );
       },
       delete: () => {
+        if (!canvas) return;
         const objects = canvas.getActiveObjects();
-        objects.forEach((object) => {
-          canvas.remove(object);
-        });
+        objects.forEach((object) => canvas.remove(object));
         canvas.discardActiveObject();
         canvas.renderAll();
+        save();
       },
-      addText: (value, options) => {
-        console.log("Adding textbox with value:", value); // Log pour confirmer la création
-        const object = new fabric.Textbox(value, {
-          ...TEXT_OPTIONS,
-          fill: fillColor,
-          editable: true,
-          padding: 10, // Padding pour rendre le fond visible
-          backgroundColor: "#ffffff", // Couleur initiale par défaut
-          ...options,
-        });
-
-        addToCanvas(object);
-        object.enterEditing();
-        object.selectAll();
-        canvas.renderAll();
-      },
+      addText,
       addCircle: () => {
+        if (!canvas) return;
         const object = new fabric.Circle({
           ...CIRCLE_OPTIONS,
           stroke: strokeColor,
@@ -260,115 +315,45 @@ export const useEditor = ({ clearSelectionCallback }: EditorHookProps) => {
         });
         addToCanvas(object);
       },
-      addSoftRetangle: () => {
+      addSoftRectangle: () => {
+        if (!canvas) return;
         const object = new fabric.Rect({
-          ...RECTAGNLE_OPTIONS,
+          ...RECTANGLE_OPTIONS,
           rx: 50,
           ry: 50,
           stroke: strokeColor,
           strokeWidth: strokeWidth,
           strokeDashArray: strokeDashArray,
         });
-
         addToCanvas(object);
       },
-      addRetangle: () => {
+      addRectangle: () => {
+        if (!canvas) return;
         const object = new fabric.Rect({
-          ...RECTAGNLE_OPTIONS,
+          ...RECTANGLE_OPTIONS,
           stroke: strokeColor,
           strokeWidth: strokeWidth,
           strokeDashArray: strokeDashArray,
         });
-
         addToCanvas(object);
       },
       addTriangle: () => {
+        if (!canvas) return;
         const object = new fabric.Triangle({
-          ...RECTAGNLE_OPTIONS,
+          ...RECTANGLE_OPTIONS,
           stroke: strokeColor,
           strokeWidth: strokeWidth,
           strokeDashArray: strokeDashArray,
         });
-
         addToCanvas(object);
       },
-      // Dans useEditor.ts, ajoutez cette méthode dans l'objet retourné par buildEditor
-      addCurvedArrow: () => {
-        const controlPointOffset = 100; // Distance de la courbe
-        const arrowLength = 150; // Longueur totale de la flèche
-        const headSize = 15; // Taille de la tête
+      addCurvedArrow: (direction: "up" | "down" | "left" | "right" = "down", curvature: number = 0.5) => {
+        if (!canvas) return;
+        const controlPointOffset = 100 * curvature;
+        const arrowLength = 150;
+        const headSize = 15;
 
-        // Définir les points pour une courbe simple (quadratique)
-        const startX = 0;
-        const startY = 0;
-        const controlX = controlPointOffset;
-        const controlY = -controlPointOffset;
-        const endX = arrowLength;
-        const endY = 0;
-
-        // Chemin SVG pour la courbe (utilisation d'une courbe quadratique)
-        const curvePath = `M ${startX} ${startY} Q ${controlX} ${controlY}, ${endX} ${endY}`;
-        const curve = new fabric.Path(curvePath, {
-          stroke: strokeColor || "#000000",
-          strokeWidth: strokeWidth || 2,
-          strokeDashArray: strokeDashArray,
-          fill: "",
-          selectable: true,
-          hasControls: true,
-          originX: "center",
-          originY: "center",
-        });
-
-        // Créer la tête de la flèche (triangle)
-        const head = new fabric.Triangle({
-          width: headSize,
-          height: headSize * 1.5,
-          fill: strokeColor || "#000000",
-          left: endX,
-          top: endY,
-          angle: 0, // Ajuster l'angle en fonction de la direction
-          originX: "center",
-          originY: "center",
-          selectable: false,
-        });
-
-        // Ajuster la position et l'angle de la tête pour suivre la courbe
-        const angle =
-          Math.atan2(endY - controlY, endX - controlX) * (180 / Math.PI) + 90;
-        head.set({ angle: angle });
-
-        // Grouper la courbe et la tête
-        const curvedArrow = new fabric.Group([curve, head], {
-          left: 0,
-          top: 0,
-          selectable: true,
-          hasControls: true,
-          hasRotatingPoint: true,
-          lockRotation: false,
-          rotatingPointOffset: 40,
-          originX: "center",
-          originY: "center",
-        });
-
-        addToCanvas(curvedArrow);
-        canvas.renderAll();
-      }, // Dans useEditor.ts, remplacez la méthode addCurvedArrow par celle-ci
-      addCurvedArrow: (
-        direction: "up" | "down" | "left" | "right" = "down",
-        curvature: number = 0.5
-      ) => {
-        const controlPointOffset = 100 * curvature; // Ajuste la courbure en fonction du paramètre
-        const arrowLength = 150; // Longueur totale de la flèche
-        const headSize = 15; // Taille de la tête
-
-        // Points de départ et contrôle en fonction de la direction
-        let startX = 0,
-          startY = 0,
-          controlX = 0,
-          controlY = 0,
-          endX = 0,
-          endY = 0;
-        let headAngle = 0;
+        let startX = 0, startY = 0, controlX = 0, controlY = 0, endX = 0, endY = 0, headAngle = 0;
 
         switch (direction) {
           case "up":
@@ -401,7 +386,6 @@ export const useEditor = ({ clearSelectionCallback }: EditorHookProps) => {
             break;
         }
 
-        // Chemin SVG pour la courbe quadratique
         const curvePath = `M ${startX} ${startY} Q ${controlX} ${controlY}, ${endX} ${endY}`;
         const curve = new fabric.Path(curvePath, {
           stroke: strokeColor || "#000000",
@@ -414,7 +398,6 @@ export const useEditor = ({ clearSelectionCallback }: EditorHookProps) => {
           originY: "center",
         });
 
-        // Créer la tête de la flèche
         const head = new fabric.Triangle({
           width: headSize,
           height: headSize * 1.5,
@@ -427,7 +410,6 @@ export const useEditor = ({ clearSelectionCallback }: EditorHookProps) => {
           selectable: false,
         });
 
-        // Grouper la courbe et la tête
         const curvedArrow = new fabric.Group([curve, head], {
           left: 0,
           top: 0,
@@ -444,6 +426,7 @@ export const useEditor = ({ clearSelectionCallback }: EditorHookProps) => {
         canvas.renderAll();
       },
       addRows: (direction: "up" | "down" | "left" | "right" = "down") => {
+        if (!canvas) return;
         let lineCoords: number[] = [0, 0, 0, 100];
         let triangleLeft = 0;
         let triangleTop = 100;
@@ -505,184 +488,136 @@ export const useEditor = ({ clearSelectionCallback }: EditorHookProps) => {
       },
       getActiveOpacity: () => {
         const selectedObject = selectedObjects[0];
-        if (!selectedObject) return 1;
-
-        const value = selectedObject.get("opacity") || 1;
-
-        return value;
+        return selectedObject ? selectedObject.get("opacity") || 1 : 1;
       },
       changeFontWeight: (value: number) => {
+        if (!canvas) return;
         const objects = canvas.getActiveObjects();
         objects.forEach((object) => {
-          if (isTextType(object.type)) {
-            // @ts-ignore
-            object.set({ fontWeight: value });
-          }
+          if (isTextType(object.type)) object.set({ fontWeight: value });
         });
-
         canvas.renderAll();
+        save();
       },
       getActiveFontStyle: () => {
         const selectedObject = selectedObjects[0];
-        if (!selectedObject) return "normal";
-        // @ts-ignore
-        const value = selectedObject.get("fontStyle") || "normal";
-
-        return value;
+        return selectedObject ? (selectedObject.get("fontStyle") as string) || "normal" : "normal";
       },
       changeFontStyle: (value: string) => {
+        if (!canvas) return;
         const objects = canvas.getActiveObjects();
         objects.forEach((object) => {
-          if (isTextType(object.type)) {
-            // @ts-ignore
-            object.set({ fontStyle: value });
-          }
+          if (isTextType(object.type)) object.set({ fontStyle: value });
         });
-
         canvas.renderAll();
+        save();
       },
       getActiveFontLineThrough: () => {
         const selectedObject = selectedObjects[0];
-        if (!selectedObject) return false;
-        // @ts-ignore
-        const value = selectedObject.get("linethrough") || false;
-
-        return value;
+        return selectedObject ? (selectedObject.get("linethrough") as boolean) || false : false;
       },
       changeFontLineThrough: (value: boolean) => {
+        if (!canvas) return;
         const objects = canvas.getActiveObjects();
         objects.forEach((object) => {
-          if (isTextType(object.type)) {
-            // @ts-ignore
-            object.set({ linethrough: value });
-          }
+          if (isTextType(object.type)) object.set({ linethrough: value });
         });
-
         canvas.renderAll();
+        save();
       },
       getActiveTextAlign: () => {
         const selectedObject = selectedObjects[0];
-        if (!selectedObject) return "left";
-        // @ts-ignore
-        const value = selectedObject.get("textAlign") || "left";
-
-        return value;
+        return selectedObject ? (selectedObject.get("textAlign") as string) || "left" : "left";
       },
-      changeTexAlign: (value: string) => {
+      changeTextAlign: (value: string) => {
+        if (!canvas) return;
         const objects = canvas.getActiveObjects();
         objects.forEach((object) => {
-          if (isTextType(object.type)) {
-            // @ts-ignore
-            object.set({ textAlign: value });
-          }
+          if (isTextType(object.type)) object.set({ textAlign: value });
         });
-
         canvas.renderAll();
+        save();
       },
       getActiveFontSize: () => {
         const selectedObject = selectedObjects[0];
-        if (!selectedObject) return FONT_SIZE;
-        // @ts-ignore
-        const value = selectedObject.get("fontSize") || FONT_SIZE;
-
-        return value;
+        return selectedObject ? (selectedObject.get("fontSize") as number) || FONT_SIZE : FONT_SIZE;
       },
       changeFontSize: (value: number) => {
+        if (!canvas) return;
         const objects = canvas.getActiveObjects();
         objects.forEach((object) => {
-          if (isTextType(object.type)) {
-            // @ts-ignore
-            object.set({ fontSize: value });
-          }
+          if (isTextType(object.type)) object.set({ fontSize: value });
         });
-
         canvas.renderAll();
+        save();
       },
       getActiveFontUnderline: () => {
         const selectedObject = selectedObjects[0];
-        if (!selectedObject) return false;
-        // @ts-ignore
-        const value = selectedObject.get("underline") || false;
-
-        return value;
+        return selectedObject ? (selectedObject.get("underline") as boolean) || false : false;
       },
       changeFontUnderline: (value: boolean) => {
+        if (!canvas) return;
         const objects = canvas.getActiveObjects();
         objects.forEach((object) => {
-          if (isTextType(object.type)) {
-            // @ts-ignore
-            object.set({ underline: value });
-          }
+          if (isTextType(object.type)) object.set({ underline: value });
         });
-
         canvas.renderAll();
+        save();
       },
       changeOpacity: (value: number) => {
+        if (!canvas) return;
         const objects = canvas.getActiveObjects();
-        objects.forEach((object) => {
-          object.set({ opacity: value });
-        });
-
+        objects.forEach((object) => object.set({ opacity: value }));
         canvas.renderAll();
+        save();
       },
       bringForward: () => {
+        if (!canvas) return;
         const objects = canvas.getActiveObjects();
-        objects.forEach((object) => {
-          canvas.bringForward(object);
-        });
-
+        objects.forEach((object) => canvas.bringForward(object));
         canvas.renderAll();
         const workspace = getWorkspace();
-        workspace?.sendToBack();
+        if (workspace) workspace.sendToBack();
+        save();
       },
       sendBackward: () => {
+        if (!canvas) return;
         const objects = canvas.getActiveObjects();
-        objects.forEach((object) => {
-          canvas.sendBackwards(object);
-        });
-
+        objects.forEach((object) => canvas.sendBackwards(object));
         canvas.renderAll();
         const workspace = getWorkspace();
-        workspace?.sendToBack();
+        if (workspace) workspace.sendToBack();
+        save();
       },
       changeFillColor: (value: string) => {
+        if (!canvas) return;
         setFillColor(value);
         const objects = canvas.getActiveObjects();
-        objects.forEach((object) => {
-          object.set({ fill: value });
-        });
-
+        objects.forEach((object) => object.set({ fill: value }));
         canvas.renderAll();
+        save();
       },
       changeBackgroundColor: (value: string) => {
-        console.log("changeBackgroundColor called with value:", value); // Log pour confirmer l'appel
+        if (!canvas) return;
         const activeObject = canvas.getActiveObject();
         if (activeObject && isTextType(activeObject.type)) {
-          // @ts-ignore
-          activeObject.set({
-            backgroundColor: value,
-            transparentCorners: false,
-          });
-          console.log("Applied backgroundColor:", value, "to", activeObject); // Log pour débogage
+          activeObject.set({ backgroundColor: value, transparentCorners: false });
           canvas.renderAll();
-          canvas.requestRenderAll(); // Force un nouveau rendu
-        } else {
-          console.log("No active text object or object is not a textbox");
+          save();
         }
       },
       changeFontFamily: (value: string) => {
+        if (!canvas) return;
         setFontFamily(value);
         const objects = canvas.getActiveObjects();
         objects.forEach((object) => {
-          if (isTextType(object.type)) {
-            // @ts-ignore
-            object.set({ fontFamily: value });
-          }
+          if (isTextType(object.type)) object.set({ fontFamily: value });
         });
-
         canvas.renderAll();
+        save();
       },
       changeStrokeColor: (value: string) => {
+        if (!canvas) return;
         setStrokeColor(value);
         const objects = canvas.getActiveObjects();
         objects.forEach((object) => {
@@ -700,9 +635,10 @@ export const useEditor = ({ clearSelectionCallback }: EditorHookProps) => {
         });
         canvas.freeDrawingBrush.color = value;
         canvas.renderAll();
+        save();
       },
-      
       changeStrokeWidth: (value: number) => {
+        if (!canvas) return;
         setStrokeWidth(value);
         const objects = canvas.getActiveObjects();
         objects.forEach((object) => {
@@ -718,9 +654,10 @@ export const useEditor = ({ clearSelectionCallback }: EditorHookProps) => {
         });
         canvas.freeDrawingBrush.width = value;
         canvas.renderAll();
+        save();
       },
-      
       changeStrokeDashArray: (value: number[]) => {
+        if (!canvas) return;
         setStrokeDashArray(value);
         const objects = canvas.getActiveObjects();
         objects.forEach((object) => {
@@ -735,83 +672,46 @@ export const useEditor = ({ clearSelectionCallback }: EditorHookProps) => {
           }
         });
         canvas.renderAll();
+        save();
       },
-      canvas,
       getActiveFontWeight: () => {
         const selectedObject = selectedObjects[0];
-        if (!selectedObject) return FONT_WEIGHT;
-        // @ts-ignore
-        const value = selectedObject.get("fontWeight") || FONT_WEIGHT;
-
-        return value;
+        return selectedObject ? (selectedObject.get("fontWeight") as number) || FONT_WEIGHT : FONT_WEIGHT;
       },
       getActiveFontFamily: () => {
         const selectedObject = selectedObjects[0];
-        if (!selectedObject) return fontFamily;
-        // @ts-ignore
-        const value = selectedObject.get("fontFamily") || fontFamily;
-
-        return value;
+        return selectedObject ? (selectedObject.get("fontFamily") as string) || fontFamily : fontFamily;
       },
       getActiveFillColor: () => {
         const selectedObject = selectedObjects[0];
-        if (!selectedObject) return fillColor;
-
-        const value = selectedObject.get("fill") || fillColor;
-
-        return value as string;
+        return selectedObject ? (selectedObject.get("fill") as string) || fillColor : fillColor;
       },
       getActiveStrokeColor: () => {
         const selectedObject = selectedObjects[0];
-        if (!selectedObject) return fillColor;
-
-        const value = selectedObject.get("stroke") || strokeColor;
-
-        return value;
+        return selectedObject ? (selectedObject.get("stroke") as string) || strokeColor : strokeColor;
       },
       getActiveStrokeWidth: () => {
         const selectedObject = selectedObjects[0];
-        if (!selectedObject) return strokeWidth;
-
-        const value = selectedObject.get("strokeWidth") || strokeWidth;
-
-        return value;
+        return selectedObject ? (selectedObject.get("strokeWidth") as number) || strokeWidth : strokeWidth;
       },
       getActiveStrokeDashArray: () => {
         const selectedObject = selectedObjects[0];
-        if (!selectedObject) return strokeDashArray;
-
-        const value = selectedObject.get("strokeDashArray") || strokeDashArray;
-
-        return value;
+        return selectedObject ? (selectedObject.get("strokeDashArray") as number[]) || strokeDashArray : strokeDashArray;
       },
       selectedObjects,
+      addVideoAnnotation,
+      cropVideo,
     };
   };
 
-  const { copy, paste } = useClipboard({
-    canvas,
-  });
-
-  const { autoZoom } = useAutoResize({
-    canvas,
-    container,
-  });
+  const { copy, paste } = useClipboard({ canvas });
+  const { autoZoom } = useAutoResize({ canvas, container });
 
   useCanvasEvents({
     save,
     canvas,
     setSelectedObjects,
     clearSelectionCallback,
-  });
-
-  useHotkeys({
-    canvas,
-    copy,
-    paste,
-    redo,
-    save,
-    undo,
   });
 
   const editor = useMemo(() => {
@@ -839,7 +739,6 @@ export const useEditor = ({ clearSelectionCallback }: EditorHookProps) => {
         setFontFamily,
       });
     }
-
     return undefined;
   }, [
     autoZoom,
@@ -847,7 +746,6 @@ export const useEditor = ({ clearSelectionCallback }: EditorHookProps) => {
     fillColor,
     strokeColor,
     strokeWidth,
-    selectedObjects,
     strokeDashArray,
     setFontFamily,
     copy,
@@ -865,8 +763,10 @@ export const useEditor = ({ clearSelectionCallback }: EditorHookProps) => {
       initialContainer,
     }: {
       initialCanvas: fabric.Canvas;
-      initialContainer: HTMLDivElement;
+      initialContainer: HTMLElement;
     }) => {
+      if (!initialContainer) return;
+
       const initialWorkspace = new fabric.Rect({
         width: 900,
         height: 1200,
@@ -896,6 +796,17 @@ export const useEditor = ({ clearSelectionCallback }: EditorHookProps) => {
     },
     [canvasHistory, setHistoryIndex]
   );
+
+  useEffect(() => {
+    const handleResize = () => {
+      if (canvas && container) {
+        canvas.setDimensions({ width: container.offsetWidth, height: container.offsetHeight });
+        canvas.renderAll();
+      }
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [canvas, container]);
 
   return { init, editor, copy, paste };
 };

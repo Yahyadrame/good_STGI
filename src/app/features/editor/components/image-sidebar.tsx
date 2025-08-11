@@ -1,3 +1,4 @@
+"use client";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { ActiveTool, Editor, fonts } from "../../types";

@@ -1,3 +1,5 @@
+"use client";
+
 import { cn } from "@/lib/utils";
 import { ActiveTool, Editor } from "../../types";
 import { ToolSidebarHeader } from "./tool-sidebar-header";
@@ -6,7 +8,6 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { ShapeTool } from "./shape-tool";
 import { FaArrowDown, FaCircle, FaSquare, FaSquareFull } from "react-icons/fa";
 import { IoTriangle } from "react-icons/io5";
-import { FaDiamond } from "react-icons/fa6";
 import { useState } from "react";
 
 interface ShapeSidebarProps {
@@ -24,7 +25,7 @@ export const ShapesSidebar = ({
     onChangeActiveTool("select");
   };
 
-  const [curvature, setCurvature] = useState(0.5); // Valeur initiale de courbure
+  const [curvature, setCurvature] = useState(0.5);
 
   const addCurvedArrowWithOptions = (
     direction: "up" | "down" | "left" | "right"
@@ -35,15 +36,15 @@ export const ShapesSidebar = ({
   };
 
   return (
-    <aside
+    <div
       className={cn(
-        "bg-white relative border-r z-[40] w-[360px] h-full flex flex-col",
+        "bg-white relative border-r z-[40] w-full flex flex-col",
         activeTool === "shapes" ? "visible" : "hidden"
       )}
     >
       <ToolSidebarHeader
-        title="shapes"
-        description="add shape to your canvas"
+        title="Formes"
+        description="Ajouter des formes à votre canvas"
       />
       <ScrollArea>
         <div className="p-4 space-y-4">
@@ -83,7 +84,7 @@ export const ShapesSidebar = ({
             />
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-medium">Curvature</label>
+            <label className="text-sm font-medium">Courbure</label>
             <input
               type="range"
               min="-1"
@@ -97,6 +98,6 @@ export const ShapesSidebar = ({
         </div>
       </ScrollArea>
       <ToolSidebarClose onClick={onClose} />
-    </aside>
+    </div>
   );
 };

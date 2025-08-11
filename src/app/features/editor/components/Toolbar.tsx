@@ -1,3 +1,4 @@
+"use client";
 import { ActiveTool, Editor, FONT_SIZE, FONT_WEIGHT } from "../../types";
 import { Hint } from "@/components/hint";
 import { Button } from "@/components/ui/button";
