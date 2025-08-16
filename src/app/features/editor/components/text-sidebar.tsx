@@ -1,12 +1,11 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { ActiveTool, Editor, TEXT_STYLES } from "../../types";
+import { ActiveTool, Editor } from "../../types";
 import { ToolSidebarHeader } from "./tool-sidebar-header";
 import { ToolSidebarClose } from "./tool-sidebar-close";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Button, Select, TextInput, Stack } from "@mantine/core";
-import { useState } from "react";
+import { Button } from "@/components/ui/button";
 
 interface TextSidebarProps {
   editor: Editor | undefined;
@@ -19,17 +18,8 @@ export const TextSidebar = ({
   activeTool,
   onChangeActiveTool,
 }: TextSidebarProps) => {
-  const [text, setText] = useState("");
-  const [style, setStyle] = useState<string>("Paragraph");
-
   const onClose = () => {
     onChangeActiveTool("select");
-  };
-
-  const handleAddText = () => {
-    if (!text || !editor) return;
-    editor.addText(text, TEXT_STYLES[style]);
-    setText("");
   };
 
   return (
@@ -39,62 +29,54 @@ export const TextSidebar = ({
         activeTool === "text" ? "visible" : "hidden"
       )}
     >
-      <ToolSidebarHeader title="Texte" description="Ajouter du texte au canvas" />
+      <ToolSidebarHeader title="Text" description="Add text to your canvas" />
       <ScrollArea>
-        <Stack spacing="md" className="p-4">
-          <TextInput
-            label="Texte"
-            placeholder="Entrez le texte à ajouter"
-            value={text}
-            onChange={(e) => setText(e.currentTarget.value)}
+        <div className="p-4 space-y-4 border-b">
+          <Button
             className="w-full"
-          />
-          <Select
-            label="Style"
-            value={style}
-            onChange={(value) => setStyle(value || "Paragraph")}
-            data={Object.keys(TEXT_STYLES).map((key) => ({ value: key, label: key }))}
-          />
-          <Button
-            onClick={handleAddText}
-            className="bg-blue-600 hover:bg-blue-700 text-white"
-            disabled={!text}
+            onClick={() => editor?.addText("Hello World")}
           >
-            Ajouter au canvas
+            Add a Textbox
           </Button>
           <Button
             className="w-full h-16"
             variant="secondary"
             size="lg"
-            onClick={() => editor?.addText("Titre", TEXT_STYLES.Heading)}
+            onClick={() =>
+              editor?.addText("Heading", {
+                fontSize: 80,
+                fontWeight: 700,
+              })
+            }
           >
-            <span className="text-3xl font-bold">Ajouter un titre</span>
+            <span className="text-3xl font-bold">Add Heading</span>
           </Button>
           <Button
             className="w-full h-16"
             variant="secondary"
             size="lg"
-            onClick={() => editor?.addText("Sous-titre", TEXT_STYLES.Subheading)}
+            onClick={() =>
+              editor?.addText("Subheading", {
+                fontSize: 44,
+                fontWeight: 600,
+              })
+            }
           >
-            <span className="text-xl font-semibold">Ajouter un sous-titre</span>
+            <span className="text-xl font-semibold">Add Subheading</span>
           </Button>
           <Button
             className="w-full h-16"
             variant="secondary"
             size="lg"
-            onClick={() => editor?.addText("Paragraphe", TEXT_STYLES.Paragraph)}
+            onClick={() =>
+              editor?.addText("Paragraph", {
+                fontSize: 32,
+              })
+            }
           >
-            Paragraphe
+            Paragraph
           </Button>
-          <Button
-            className="w-full h-16"
-            variant="secondary"
-            size="lg"
-            onClick={() => editor?.addText("Instruction", TEXT_STYLES.Instruction)}
-          >
-            <span className="text-lg italic text-blue-600">Ajouter une instruction</span>
-          </Button>
-        </Stack>
+        </div>
       </ScrollArea>
       <ToolSidebarClose onClick={onClose} />
     </aside>

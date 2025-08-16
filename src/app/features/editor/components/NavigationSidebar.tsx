@@ -1,9 +1,9 @@
-'use client';
+"use client";
 
-import { Folder, FileText, List } from 'lucide-react';
-import { SideBartItem } from './Sidebar-item';
-import Link from 'next/link';
-import { ActiveTool } from '../../types';
+import { Folder, FileText, List } from "lucide-react";
+import { SideBartItem } from "./Sidebar-item";
+import Link from "next/link";
+import { ActiveTool } from "../../types";
 
 interface NavigationSidebarProps {
   activeTool: ActiveTool;
@@ -15,7 +15,15 @@ interface NavigationSidebarProps {
   instructionId?: string | string[];
 }
 
-export const NavigationSidebar = ({ activeTool, onChangeActiveTool, folders, instructions, steps, folderId, instructionId }: NavigationSidebarProps) => {
+export const NavigationSidebar = ({
+  activeTool,
+  onChangeActiveTool,
+  folders,
+  instructions,
+  steps,
+  folderId,
+  instructionId,
+}: NavigationSidebarProps) => {
   return (
     <aside className="bg-white w-[250px] h-full border-r shadow-sm overflow-y-auto">
       <div className="p-4">
@@ -25,8 +33,8 @@ export const NavigationSidebar = ({ activeTool, onChangeActiveTool, folders, ins
             <SideBartItem
               icon={Folder}
               label="Dossiers"
-              isActive={activeTool === 'folders'}
-              onClick={() => onChangeActiveTool('folders')}
+              isActive={activeTool === "folders"}
+              onClick={() => onChangeActiveTool("folders")}
             />
           </Link>
           {folders && (
@@ -47,15 +55,18 @@ export const NavigationSidebar = ({ activeTool, onChangeActiveTool, folders, ins
               <SideBartItem
                 icon={FileText}
                 label="Instructions"
-                isActive={activeTool === 'instructions'}
-                onClick={() => onChangeActiveTool('instructions')}
+                isActive={activeTool === "instructions"}
+                onClick={() => onChangeActiveTool("instructions")}
               />
             </Link>
           )}
           {instructions && folderId && (
             <div className="pl-4 space-y-1">
               {instructions.map((instruction) => (
-                <Link key={instruction.id} href={`/editor/${folderId}/${instruction.id}`}>
+                <Link
+                  key={instruction.id}
+                  href={`/editor/${folderId}/${instruction.id}`}
+                >
                   <SideBartItem
                     icon={FileText}
                     label={instruction.title}
@@ -70,15 +81,18 @@ export const NavigationSidebar = ({ activeTool, onChangeActiveTool, folders, ins
               <SideBartItem
                 icon={List}
                 label="Étapes"
-                isActive={activeTool === 'steps'}
-                onClick={() => onChangeActiveTool('steps')}
+                isActive={activeTool === "steps"}
+                onClick={() => onChangeActiveTool("steps")}
               />
             </Link>
           )}
           {steps && instructionId && (
             <div className="pl-4 space-y-1">
               {steps.map((step, index) => (
-                <Link key={step.id} href={`/editor/${folderId}/${instructionId}/edit/${step.id}`}>
+                <Link
+                  key={step.id}
+                  href={`/editor/${folderId}/${instructionId}/edit/${step.id}`}
+                >
                   <SideBartItem
                     icon={List}
                     label={`Étape ${index + 1}`}

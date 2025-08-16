@@ -1,16 +1,20 @@
-'use client';
+"use client";
 
-import { useRouter } from 'next/navigation';
-import { useSortable } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
+import { useRouter } from "next/navigation";
+import { useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 interface SortableInstructionProps {
   instruction: any;
   folderId: string | string[];
 }
 
-const SortableInstruction = ({ instruction, folderId }: SortableInstructionProps) => {
-  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: instruction.id.toString() });
+const SortableInstruction = ({
+  instruction,
+  folderId,
+}: SortableInstructionProps) => {
+  const { attributes, listeners, setNodeRef, transform, transition } =
+    useSortable({ id: instruction.id.toString() });
   const router = useRouter();
 
   const style = {
@@ -41,14 +45,21 @@ interface InstructionListProps {
   folderId: string | string[];
 }
 
-export const InstructionList = ({ instructions, folderId }: InstructionListProps) => {
+export const InstructionList = ({
+  instructions,
+  folderId,
+}: InstructionListProps) => {
   return (
     <div className="space-y-4">
       {instructions.length === 0 ? (
         <p className="text-gray-500">Aucune instruction disponible.</p>
       ) : (
         instructions.map((instruction) => (
-          <SortableInstruction key={instruction.id} instruction={instruction} folderId={folderId} />
+          <SortableInstruction
+            key={instruction.id}
+            instruction={instruction}
+            folderId={folderId}
+          />
         ))
       )}
     </div>

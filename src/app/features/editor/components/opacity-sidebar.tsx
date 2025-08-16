@@ -1,4 +1,3 @@
-"use client";
 import { cn } from "@/lib/utils";
 import { ActiveTool, Editor } from "../../types";
 import { ToolSidebarHeader } from "./tool-sidebar-header";
